@@ -6,13 +6,9 @@ export interface VersionStamp {
 }
 
 export function isIncomingNewer(incoming: VersionStamp, existing: VersionStamp): boolean {
-  const incomingMs = Date.parse(incoming.updatedAt);
-  const existingMs = Date.parse(existing.updatedAt);
-  if (incomingMs !== existingMs) {
-    return incomingMs > existingMs;
-  }
+  const delta = Date.parse(incoming.updatedAt) - Date.parse(existing.updatedAt);
   // Code-unit tie-breaker matches PostgreSQL COLLATE "C" so concurrent edits converge identically on every node.
-  return incoming.clientId > existing.clientId;
+  return delta !== 0 ? delta > 0 : incoming.clientId > existing.clientId;
 }
 
 export function computeBackoffDelay(
@@ -22,33 +18,29 @@ export function computeBackoffDelay(
   random: () => number = Math.random,
 ): number {
   const ceiling = Math.min(maxDelayMs, baseDelayMs * 2 ** attempt);
-  const half = ceiling / 2;
-  return Math.round(half + random() * half);
+  return Math.round(ceiling * (0.5 + random() * 0.5));
 }
-
-const defaultSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function withBackoff<T>(
   operation: () => Promise<T>,
-  options: RetryOptions = {},
+  {
+    maxAttempts = 4,
+    baseDelayMs = 150,
+    maxDelayMs = 5_000,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    random = Math.random,
+  }: RetryOptions = {},
 ): Promise<T> {
-  const maxAttempts = Math.max(1, options.maxAttempts ?? 4);
-  const baseDelayMs = options.baseDelayMs ?? 150;
-  const maxDelayMs = options.maxDelayMs ?? 5_000;
-  const sleep = options.sleep ?? defaultSleep;
-  const random = options.random ?? Math.random;
-
+  const limit = Math.max(1, maxAttempts);
   let lastError: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < limit; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      if (attempt + 1 >= maxAttempts) {
-        break;
+      if (attempt + 1 < limit) {
+        await sleep(computeBackoffDelay(attempt, baseDelayMs, maxDelayMs, random));
       }
-      await sleep(computeBackoffDelay(attempt, baseDelayMs, maxDelayMs, random));
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));

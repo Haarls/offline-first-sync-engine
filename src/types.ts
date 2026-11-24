@@ -5,31 +5,19 @@ export const UtcTimestampSchema = z
   .refine((val) => !Number.isNaN(Date.parse(val)), { message: 'Invalid ISO-8601 timestamp' })
   .transform((val) => new Date(val).toISOString());
 
-export const JsonObjectSchema = z.record(z.string(), z.unknown());
-
 export const MutationSchema = z.object({
   idempotencyKey: z.string().uuid(),
   entity: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_:-]+$/),
   entityId: z.string().min(1).max(128),
   clientId: z.string().min(1).max(64),
-  payload: JsonObjectSchema,
+  payload: z.record(z.string(), z.unknown()),
   updatedAt: UtcTimestampSchema,
   revision: z.number().int().positive(),
   deleted: z.boolean(),
 });
 
 export type Mutation = z.infer<typeof MutationSchema>;
-
-export interface SyncedRecord {
-  serverSeq: number;
-  entity: string;
-  entityId: string;
-  clientId: string;
-  payload: Record<string, unknown>;
-  updatedAt: string;
-  revision: number;
-  deleted: boolean;
-}
+export type SyncedRecord = Omit<Mutation, 'idempotencyKey'> & { serverSeq: number };
 
 export interface PushResult {
   ackedKeys: string[];

@@ -20,38 +20,25 @@ export class MemoryRemote implements RemoteStore {
 
     for (const raw of mutations) {
       const m = MutationSchema.parse(raw);
+      ackedKeys.push(m.idempotencyKey);
       if (this.appliedKeys.has(m.idempotencyKey)) {
         duplicateCount++;
-        ackedKeys.push(m.idempotencyKey);
         continue;
       }
 
       this.appliedKeys.add(m.idempotencyKey);
-      const compositeKey = `${m.entity}:${m.entityId}`;
-      const existing = this.records.get(compositeKey);
+      const key = `${m.entity}:${m.entityId}`;
+      const existing = this.records.get(key);
 
-      if (
-        !existing ||
-        isIncomingNewer(
-          { updatedAt: m.updatedAt, clientId: m.clientId },
-          { updatedAt: existing.updatedAt, clientId: existing.clientId },
-        )
-      ) {
-        this.seq += 1;
-        this.records.set(compositeKey, {
-          serverSeq: this.seq,
-          entity: m.entity,
-          entityId: m.entityId,
-          clientId: m.clientId,
+      if (!existing || isIncomingNewer(m, existing)) {
+        const { idempotencyKey: _, ...rest } = m;
+        this.records.set(key, {
+          ...rest,
           payload: structuredClone(m.payload),
-          updatedAt: m.updatedAt,
-          revision: m.revision,
-          deleted: m.deleted,
+          serverSeq: ++this.seq,
         });
       }
-
       appliedCount++;
-      ackedKeys.push(m.idempotencyKey);
     }
 
     return { ackedKeys, appliedCount, duplicateCount };
@@ -64,10 +51,6 @@ export class MemoryRemote implements RemoteStore {
       .slice(0, limit)
       .map((r) => ({ ...r, payload: structuredClone(r.payload) }));
 
-    const last = records[records.length - 1];
-    return {
-      records,
-      lastSeq: last ? last.serverSeq : afterSeq,
-    };
+    return { records, lastSeq: records[records.length - 1]?.serverSeq ?? afterSeq };
   }
 }
