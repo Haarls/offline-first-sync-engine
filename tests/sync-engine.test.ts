@@ -24,8 +24,12 @@ describe('offline-first-sync-engine', () => {
     const remote = new MemoryRemote();
     const [posA, posB] = [createNode('pos-terminal-a'), createNode('pos-terminal-b')];
 
-    expect(posA.put('product', 'sku-101', { name: 'Espresso Beans 1kg', stock: 24 }).revision).toBe(1);
-    expect(posA.put('product', 'sku-101', { name: 'Espresso Beans 1kg', stock: 21 }).revision).toBe(2);
+    expect(posA.put('product', 'sku-101', { name: 'Espresso Beans 1kg', stock: 24 }).revision).toBe(
+      1,
+    );
+    expect(posA.put('product', 'sku-101', { name: 'Espresso Beans 1kg', stock: 21 }).revision).toBe(
+      2,
+    );
     expect(posA.pendingOutbox()).toHaveLength(2);
 
     expect((await posA.sync(remote)).pushed).toBe(2);
@@ -75,7 +79,9 @@ describe('offline-first-sync-engine', () => {
 
     const node = createNode('pos-register-3');
     node.put('order', 'ord-900', { totalUsd: 42.5 });
-    await expect(node.sync(flakyRemote, { retry: { maxAttempts: 1 } })).rejects.toThrow('ECONNRESET');
+    await expect(node.sync(flakyRemote, { retry: { maxAttempts: 1 } })).rejects.toThrow(
+      'ECONNRESET',
+    );
     expect(node.pendingOutbox()).toHaveLength(1);
 
     const recovery = await node.sync(flakyRemote);
@@ -87,7 +93,8 @@ describe('offline-first-sync-engine', () => {
     const inner = new MemoryRemote();
     let failures = 3;
     const unstable: RemoteStore = {
-      push: async (m) => (failures-- > 0 ? Promise.reject(new Error('ENETUNREACH')) : inner.push(m)),
+      push: async (m) =>
+        failures-- > 0 ? Promise.reject(new Error('ENETUNREACH')) : inner.push(m),
       pull: (afterSeq, limit) => inner.pull(afterSeq, limit),
     };
 
@@ -96,7 +103,13 @@ describe('offline-first-sync-engine', () => {
     node.put('shift', 'shift-44', { status: 'OPEN' });
 
     const res = await node.sync(unstable, {
-      retry: { maxAttempts: 5, baseDelayMs: 100, maxDelayMs: 2_000, random: () => 0.5, sleep: async (ms) => void delays.push(ms) },
+      retry: {
+        maxAttempts: 5,
+        baseDelayMs: 100,
+        maxDelayMs: 2_000,
+        random: () => 0.5,
+        sleep: async (ms) => void delays.push(ms),
+      },
     });
     expect(res.pushed).toBe(1);
     expect(delays).toEqual([75, 150, 300]);
@@ -106,17 +119,33 @@ describe('offline-first-sync-engine', () => {
     const remote = new MemoryRemote();
     const [cashier, auditor] = [createNode('pos-caja-1'), createNode('hq-audit')];
 
-    const morning = freezeCurrencyTx({ amountUsd: 19.99, quoteCurrency: 'VES', exchangeRate: 36.5, capturedAt: '2026-11-23T12:00:00.000Z' });
+    const morning = freezeCurrencyTx({
+      amountUsd: 19.99,
+      quoteCurrency: 'VES',
+      exchangeRate: 36.5,
+      capturedAt: '2026-11-23T12:00:00.000Z',
+    });
     cashier.put('sale', 'inv-001', { payment: morning });
 
-    const afternoon = freezeCurrencyTx({ amountUsd: 19.99, quoteCurrency: 'VES', exchangeRate: 42.85, capturedAt: '2026-11-23T18:00:00.000Z' });
+    const afternoon = freezeCurrencyTx({
+      amountUsd: 19.99,
+      quoteCurrency: 'VES',
+      exchangeRate: 42.85,
+      capturedAt: '2026-11-23T18:00:00.000Z',
+    });
     cashier.put('sale', 'inv-002', { payment: afternoon });
 
     await cashier.sync(remote);
     await auditor.sync(remote);
 
-    expect(auditor.get<{ payment: typeof morning }>('sale', 'inv-001')?.payment).toMatchObject({ exchangeRate: 36.5, convertedAmount: 729.64 });
-    expect(auditor.get<{ payment: typeof afternoon }>('sale', 'inv-002')?.payment).toMatchObject({ exchangeRate: 42.85, convertedAmount: 856.57 });
+    expect(auditor.get<{ payment: typeof morning }>('sale', 'inv-001')?.payment).toMatchObject({
+      exchangeRate: 36.5,
+      convertedAmount: 729.64,
+    });
+    expect(auditor.get<{ payment: typeof afternoon }>('sale', 'inv-002')?.payment).toMatchObject({
+      exchangeRate: 42.85,
+      convertedAmount: 856.57,
+    });
   });
 
   it('propagates tombstone deletions across offline nodes without resurrecting older state', async () => {
@@ -136,10 +165,14 @@ describe('offline-first-sync-engine', () => {
   });
 
   it('configures Neon SSL cleanly when sslmode=require or neon.tech host is provided', () => {
-    const neonCfg = buildPgPoolConfig('postgresql://haarls:secret@ep-cool-frog-123.us-east-2.aws.neon.tech/neondb?sslmode=require');
+    const neonCfg = buildPgPoolConfig(
+      'postgresql://haarls:secret@ep-cool-frog-123.us-east-2.aws.neon.tech/neondb?sslmode=require',
+    );
     expect(neonCfg.ssl).toEqual({ rejectUnauthorized: true });
     expect(neonCfg.connectionString).not.toContain('sslmode=');
 
-    expect(buildPgPoolConfig('postgresql://postgres:postgres@localhost:5432/sync_engine').ssl).toBeUndefined();
+    expect(
+      buildPgPoolConfig('postgresql://postgres:postgres@localhost:5432/sync_engine').ssl,
+    ).toBeUndefined();
   });
 });

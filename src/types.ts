@@ -7,7 +7,11 @@ export const UtcTimestampSchema = z
 
 export const MutationSchema = z.object({
   idempotencyKey: z.string().uuid(),
-  entity: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_:-]+$/),
+  entity: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-zA-Z0-9_:-]+$/),
   entityId: z.string().min(1).max(128),
   clientId: z.string().min(1).max(64),
   payload: z.record(z.string(), z.unknown()),

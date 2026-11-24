@@ -23,7 +23,8 @@ const TLS_MODES = new Set(['require', 'verify-ca', 'verify-full']);
 export function buildPgPoolConfig(connectionString: string, max = 5): PoolConfig {
   const parsed = new URL(connectionString);
   const sslMode = parsed.searchParams.get('sslmode');
-  const useTls = parsed.hostname.endsWith('.neon.tech') || (sslMode !== null && TLS_MODES.has(sslMode));
+  const useTls =
+    parsed.hostname.endsWith('.neon.tech') || (sslMode !== null && TLS_MODES.has(sslMode));
 
   // Strip sslmode from URL when enabling explicit TLS options so pg-connection-string does not override rejectUnauthorized.
   if (useTls && sslMode) parsed.searchParams.delete('sslmode');
@@ -106,7 +107,15 @@ export class PostgresRemote implements RemoteStore {
              deleted = EXCLUDED.deleted
            WHERE EXCLUDED.updated_at > sync_records.updated_at
               OR (EXCLUDED.updated_at = sync_records.updated_at AND EXCLUDED.client_id > sync_records.client_id)`,
-          [m.entity, m.entityId, m.clientId, JSON.stringify(m.payload), m.updatedAt, m.revision, m.deleted],
+          [
+            m.entity,
+            m.entityId,
+            m.clientId,
+            JSON.stringify(m.payload),
+            m.updatedAt,
+            m.revision,
+            m.deleted,
+          ],
         );
         appliedCount++;
       }
