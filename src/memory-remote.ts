@@ -31,10 +31,14 @@ export class MemoryRemote implements RemoteStore {
       const existing = this.records.get(key);
 
       if (!existing || isIncomingNewer(m, existing)) {
-        const { idempotencyKey: _, ...rest } = m;
         this.records.set(key, {
-          ...rest,
+          entity: m.entity,
+          entityId: m.entityId,
+          clientId: m.clientId,
           payload: structuredClone(m.payload),
+          updatedAt: m.updatedAt,
+          revision: m.revision,
+          deleted: m.deleted,
           serverSeq: ++this.seq,
         });
       }
